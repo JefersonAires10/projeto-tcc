@@ -327,9 +327,6 @@ function ObraDetail({ obra, municipio, ano, onBack }) {
             Esta obra consta como paralisada na base do TCE-CE. Obras paralisadas com execução financeira acima de 30% sem conclusão física correspondente
             são indicadores de possível irregularidade. Recomenda-se investigar o contrato associado e os responsáveis.
           </div>
-          <BtnOutline style={{ marginTop: 10 }} onClick={() => window.sendPrompt?.(`Quais são as implicações legais de uma obra pública paralisada no Ceará? Como um cidadão pode denunciar?`)}>
-            Como denunciar ↗
-          </BtnOutline>
         </div>
       )}
 

@@ -49,10 +49,10 @@ export default function F1({ municipio, ano }) {
 
       if (previsto === 0) { previsto = 142500000; empenhado = previsto * 0.626; liquidado = previsto * 0.454; }
 
-      const prevM = MESES.map(() => Math.round(previsto / 12)); 
+      const prevM = MESES.map(() => Math.round(previsto / 12));
       const realM = MESES.map((_, i) => {
         const m = i + 1;
-        if (m > maxMes) return 0; 
+        if (m > maxMes) return 0;
 
         const liqAtual = balancetes
           .filter(b => parseInt(String(b.data_referencia_doc || '0').slice(-2)) === m)
@@ -113,22 +113,31 @@ export default function F1({ municipio, ano }) {
   const liqPct = (liquidado / previsto * 100).toFixed(1);
 
   const mesesComDados = data.realM.filter(v => v > 0).length || 1;
-  const mediaMensal = liquidado / mesesComDados;
-  const projecaoFinal = liquidado + (mediaMensal * (12 - mesesComDados));
-  const riscoEstouro = projecaoFinal > previsto;
   const restosAPagar = Math.max(0, empenhado - liquidado);
   const pctRestos = empenhado > 0 ? ((restosAPagar / empenhado) * 100).toFixed(1) : 0;
-  const mesPico = Math.max(...data.realM);
+
+  // Novas análises
+  const idealExecPct = (mesesComDados / 12) * 100;
+  const ritmoExec = idealExecPct > 0 ? (parseFloat(liqPct) / idealExecPct) : 0;
+  const ritmoLabel = ritmoExec > 1.1 ? 'Acelerado' : ritmoExec < 0.9 ? 'Lento' : 'Normal';
+  const ritmoClass = ritmoExec > 1.1 ? 'neg' : ritmoExec < 0.9 ? 'alerta' : 'pos';
+
+  const gastosMensais = data.realM.filter(v => v > 0);
+  const mediaMensalRealizada = gastosMensais.reduce((a, b) => a + b, 0) / mesesComDados;
+  const desvioPadraoMensal = Math.sqrt(gastosMensais.map(v => Math.pow(v - mediaMensalRealizada, 2)).reduce((a, b) => a + b, 0) / mesesComDados);
+  const cvMensal = mediaMensalRealizada > 0 ? (desvioPadraoMensal / mediaMensalRealizada) * 100 : 0;
+  const mesPico = Math.max(...gastosMensais);
   const nomeMesPico = MESES[data.realM.indexOf(mesPico)];
 
   return (
     <div>
       <SectionHeader title="Painel Orçamentário" sub={`/sim/dados_orcamentos?exercicio_orcamento=${ano}00&codigo_municipio=${municipio || '[todos]'}`} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total Previsto" badge="Anual" badgeClass="anual" value={fmt(previsto)} delta="LOA aprovada" />
-        <KpiCard label="Total Empenhado" badge="Reservado" badgeClass="reservado" value={fmt(empenhado)} delta={`${empPct}% do previsto`} deltaClass={parseFloat(empPct) > 50 ? 'pos' : 'neu'} />
-        <KpiCard label="Total Liquidado" badge="Efetuado" badgeClass="efetuado" value={fmt(liquidado)} delta={`${liqPct}% do total empenhado`} deltaClass={parseFloat(liqPct) > 60 ? 'pos' : 'neu'} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Total Previsto" badge="Anual" badgeClass="anual" value={fmt(previsto)} sub="LOA aprovada" />
+        <KpiCard label="Liquidado" badge={`${liqPct}%`} badgeClass="efetuado" value={fmt(liquidado)} sub={`${mesesComDados}/12 meses`} />
+        <KpiCard label="Empenhado" badge={`${empPct}%`} badgeClass="reservado" value={fmt(empenhado)} sub="relação empenho/previsão" />
+        <KpiCard label="Restos a Pagar" badge="Risco" badgeClass="alerta" value={fmt(restosAPagar)} delta={`${pctRestos}% do empenhado`} deltaClass={parseFloat(pctRestos) > 30 ? 'neg' : 'neu'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -184,31 +193,32 @@ export default function F1({ municipio, ano }) {
         </div>
 
         {showAnalise && (
-          <div style={{ marginTop: 16, background: 'var(--bg2)', border: '1px solid var(--border)', borderLeft: riscoEstouro ? '3px solid var(--amber)' : '3px solid var(--green)', borderRadius: 8, padding: 16, animation: 'slideIn .2s ease' }}>
+          <div style={{ marginTop: 16, background: 'var(--bg2)', border: '1px solid var(--border)', borderLeft: ritmoClass === 'neg' ? '3px solid var(--red)' : '3px solid var(--green)', borderRadius: 8, padding: 16, animation: 'slideIn .2s ease' }}>
             <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
             <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Relatório Analítico do Exercício</h5>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Projeção de Fim de Ano</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Ritmo de Execução</div>
                 <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
-                  Média mensal: <strong style={{ color: 'var(--text)' }}>{fmt(mediaMensal)}</strong>.<br />
-                  Projeção anual: <strong style={{ color: riscoEstouro ? 'var(--amber)' : 'var(--green)' }}>{fmt(projecaoFinal)}</strong>.<br />
-                  {riscoEstouro ? 'Ritmo atual tende a ultrapassar a LOA prevista.' : 'Ritmo dentro do teto orçamentário previsto.'}
+                  Execução ideal: <strong style={{ color: 'var(--text)' }}>{idealExecPct.toFixed(1)}%</strong> vs real: <strong style={{ color: 'var(--text)' }}>{liqPct}%</strong>.<br />
+                  Ritmo: <strong style={{ color: ritmoClass === 'neg' ? 'var(--red)' : ritmoClass === 'pos' ? 'var(--green)' : 'var(--amber)' }}>{ritmoLabel} ({(ritmoExec * 100).toFixed(0)}%)</strong>.<br />
+                  {ritmoLabel === 'Acelerado' ? 'Gastos acima do esperado para o período.' : ritmoLabel === 'Lento' ? 'Sub-execução orçamentária no período.' : 'Execução em linha com o esperado.'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Risco de Restos a Pagar</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Volatilidade Mensal</div>
                 <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
-                  Diferença Empenho vs Liquidação: <strong style={{ color: 'var(--text)' }}>{fmt(restosAPagar)}</strong>.<br />
-                  Cerca de <strong style={{ color: 'var(--text)' }}>{pctRestos}%</strong> do valor empenhado ainda não foi liquidado. Taxas altas no final do ano indicam "herança" de dívidas.
+                  Média mensal: <strong style={{ color: 'var(--text)' }}>{fmt(mediaMensalRealizada)}</strong>.<br />
+                  Coef. de Variação: <strong style={{ color: cvMensal > 40 ? 'var(--amber)' : 'var(--text)' }}>{cvMensal.toFixed(1)}%</strong>.<br />
+                  {cvMensal > 40 ? 'Alta volatilidade nos gastos mensais.' : 'Gastos mensais relativamente estáveis.'}
                 </div>
               </div>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Pico de Sazonalidade</div>
                 <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
                   Mês de maior liquidação: <strong style={{ color: 'var(--text)' }}>{nomeMesPico}</strong> ({fmt(mesPico)}).<br />
-                  Picos atípicos costumam ocorrer por folhas extras (13º) ou pagamentos de grandes contratos.
+                  Picos podem indicar pagamentos de 13º, grandes contratos ou sazonalidades específicas.
                 </div>
               </div>
             </div>

@@ -51,6 +51,7 @@ export default function F3({ municipio, ano }) {
   const [aba, setAba] = useState('servidores');
   const [filtro, setFiltro] = useState('');
   const [pagina, setPag] = useState(1);
+  const [showAnalise, setShowAnalise] = useState(false);
   const porPagina = 10;
   const chartVinculo = useRef(null);
   const chartFolha = useRef(null);
@@ -134,6 +135,8 @@ export default function F3({ municipio, ano }) {
         folhaPorMes[mes].valor_total_deducoes += parseFloat(f.valor_total_deducoes || 0) || 0;
       });
       const folhasData = Object.values(folhaPorMes).sort((a, b) => parseInt(a.data_referencia_doc) - parseInt(b.data_referencia_doc));
+      const totalFolhaAnual = folhasData.reduce((acc, f) => acc + (parseFloat(f.valor_total_item_orc) || 0), 0);
+      const maxFolhaMes = folhasData.length ? Math.max(...folhasData.map(f => parseFloat(f.valor_total_item_orc) || 0)) : 0;
 
       const total = agentesComSal.length;
       const comissN = agentesComSal.filter(a => (VINCULO_MAP[a.codigo_vinculo] || '') === 'COMISSIONADO').length;
@@ -142,7 +145,7 @@ export default function F3({ municipio, ano }) {
       const sals = agentesComSal.map(a => a._remuneracao).filter(v => v > 0);
       const salMed = sals.length ? sals.reduce((a, b) => a + b, 0) / sals.length : 0;
       const pctComiss = total ? ((comissN / total) * 100).toFixed(1) : '0';
-      setStats({ total, salMed, pctComiss, efet, comissN, temp });
+      setStats({ total, salMed, pctComiss, efet, comissN, temp, totalFolhaAnual, maxFolhaMes });
 
       const flags = [];
 
@@ -221,7 +224,7 @@ export default function F3({ municipio, ano }) {
   }, [loading, stats]);
 
   useEffect(() => {
-    if (!chartFolha.current || aba !== 'folha') return;
+    if (!chartFolha.current) return;
     if (instFolha.current) instFolha.current.destroy();
 
     const dados = folhas.length ? folhas : MESES.map((m, i) => ({
@@ -252,7 +255,7 @@ export default function F3({ municipio, ano }) {
       },
     });
     return () => instFolha.current?.destroy();
-  }, [folhas, aba]);
+  }, [folhas]);
 
   if (loading) return <PageSkeleton kpis={4} layout="1fr-1fr" />;
 
@@ -278,7 +281,11 @@ export default function F3({ municipio, ano }) {
   const exibidosReingressos = reingressos.slice((pagAtualReingressos - 1) * porPagina, pagAtualReingressos * porPagina);
 
   const totalDiarias = diarias.reduce((a, d) => a + parseFloat(d.valor_total_diarias || 0), 0);
-  const { total, salMed, pctComiss, efet: statsEfet, comissN: statsComiss, temp: statsTemp } = stats || {};
+  const { total, salMed, pctComiss, efet: statsEfet, comissN: statsComiss, temp: statsTemp, totalFolhaAnual = 0, maxFolhaMes = 0 } = stats || {};
+  const pctDiarias = totalFolhaAnual > 0 ? (totalDiarias / totalFolhaAnual * 100).toFixed(2) : 0;
+  const alertaComiss = parseFloat(pctComiss) > 30;
+  const alertaDiarias = parseFloat(pctDiarias) > 2;
+  const alertaReingresso = reingressos.length > 0;
 
   const abas = [
     { id: 'servidores', label: 'Servidores', badge: null },
@@ -295,35 +302,79 @@ export default function F3({ municipio, ano }) {
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total de Servidores" badge="Ativo" badgeClass="anual" value={fmtN(total || 0)} delta="" deltaClass="neu" />
-        <KpiCard label="Média Salarial" badge="Bruto" badgeClass="reservado" value={salMed ? fmt(salMed) : 'N/D'} sub={salMed ? 'Base: agentes_publicos_folha' : 'Sem dados da folha'} />
-        <KpiCard label="Cargos Comissionados" badge={pctComiss > 30 ? 'Alerta' : 'OK'} badgeClass={pctComiss > 30 ? 'alerta' : 'anual'} value={pctComiss + '%'} delta={`${statsComiss || 0} de ${total || 0} servidores`} deltaClass={pctComiss > 30 ? 'neg' : 'pos'} />
-        <KpiCard label="Diárias no Período" badge="Novo" badgeClass="reservado" value={fmt(totalDiarias)} delta={`${diarias.length} registros`} />
+        <KpiCard label="Total de Servidores" badge={ano} badgeClass="anual" value={fmtN(total || 0)} delta={`${statsEfet || 0} efetivos`} deltaClass="pos" />
+        <KpiCard label="Total Folha Anual" badge="Empenhado" badgeClass="efetuado" value={fmtBRL(totalFolhaAnual)} sub={`Pico: ${fmtBRL(maxFolhaMes)}`} />
+        <KpiCard label="Tx. Comissionados" badge="Risco" badgeClass={alertaComiss ? 'alerta' : 'efetuado'} value={`${pctComiss}%`} delta={`${statsComiss || 0} cargos`} deltaClass={alertaComiss ? 'neg' : 'neu'} />
+        <KpiCard label="Reingressos" badge="Auditoria" badgeClass={alertaReingresso ? 'alerta' : 'reservado'} value={fmtN(reingressos.length)} delta={`${fmtBRL(totalDiarias)} em diárias`} deltaClass={alertaReingresso || alertaDiarias ? 'neg' : 'neu'} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, marginBottom: 12 }}>
         <Card title="Distribuição por Vínculo" sub="/agentes_publicos_municipais">
           <div style={{ position: 'relative', height: 200 }}>
             <canvas ref={chartVinculo} role="img" aria-label="Distribuição por tipo de vínculo" />
           </div>
         </Card>
-        <div style={{ background: 'var(--red-bg)', border: '1px solid #6b1e1e', borderRadius: 8, padding: 16 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--red)', marginBottom: 4 }}><><WarningCircleIcon size={18} /> Radar de Alerta</></div>
-          <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 14 }}>{alerts.length ? 'Concentrações atípicas detectadas' : 'Nenhum alerta identificado com os dados disponíveis.'}</div>
-          {alerts.map((a, i) => (
-            <div key={i} style={{ background: 'rgba(248,81,73,.1)', border: '1px solid rgba(248,81,73,.3)', borderRadius: 6, padding: 10, marginBottom: 8 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--red)', textTransform: 'uppercase', marginBottom: 4 }}>{a.label}</div>
-              <ProgressBar value={a.pct} color="var(--red)" />
-              <div style={{ fontSize: 11, color: 'var(--text2)' }}>{a.desc}</div>
-            </div>
-          ))}
-          {reingressos.length > 0 && (
-            <div style={{ marginTop: 8, background: 'rgba(248,81,73,.08)', border: '1px solid rgba(248,81,73,.2)', borderRadius: 6, padding: 10 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', marginBottom: 4 }}><><WarningCircleIcon size={14} /> {reingressos.length} REINGRESSO(S) DETECTADO(S)</></div>
-              <div style={{ fontSize: 11, color: 'var(--text2)' }}>Servidores recontratados após desligamento. Verifique na aba Reingressos.</div>
-            </div>
+        <Card title="Evolução Mensal da Folha" sub="/folhas_pagamentos">
+          <div style={{ position: 'relative', height: 200 }}>
+            <canvas ref={chartFolha} role="img" aria-label="Evolução mensal da folha de pagamento" />
+          </div>
+        </Card>
+      </div>
+
+      <div style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+        <h4 style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>Análise de Riscos com Pessoal</h4>
+        <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.7 }}>
+          Diagnóstico baseado nos dados de folha, diárias e contratações do ano de <strong style={{ color: 'var(--text)' }}>{ano}</strong>. 
+          Total de {fmtN(total || 0)} servidores com custo anual estimado de {fmtBRL(totalFolhaAnual)}.
+        </p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+          <BtnOutline onClick={() => setShowAnalise(!showAnalise)}>
+            {showAnalise ? 'Ocultar diagnóstico ✕' : 'Diagnóstico completo ↗'}
+          </BtnOutline>
+          {!showAnalise && window.sendPrompt && (
+            <BtnOutline onClick={() => window.sendPrompt(`Como um auditor analisaria uma prefeitura que gasta ${pctComiss}% com cargos comissionados e tem ${reingressos.length} reingressos suspeitos no ano?`)}>
+              <LightbulbIcon size={14} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} />
+              Explicar com IA
+            </BtnOutline>
           )}
         </div>
+
+        {showAnalise && (
+          <div style={{ marginTop: 16, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, animation: 'slideIn .2s ease' }}>
+            <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
+            <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Relatório Analítico e Alertas</h5>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+              <div style={{ borderLeft: alertaComiss ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Proporção de Comissionados</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+                  <strong style={{ color: alertaComiss ? 'var(--amber)' : 'var(--text)' }}>{pctComiss}%</strong> do quadro é comissionado. {alertaComiss ? 'Valor acima do limite prudencial (30%), configurando possível uso político da máquina pública.' : 'Proporção dentro de níveis aceitáveis.'}
+                </div>
+              </div>
+              <div style={{ borderLeft: alerts.some(a => a.severity === 'critico' || a.severity === 'alto' && a.label.includes('ÓRGÃO')) ? '3px solid var(--red)' : '3px solid var(--green)', paddingLeft: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Concentração por Órgão</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+                  {alerts.filter(a => a.label.includes('ÓRGÃO')).length > 0 ? (
+                    alerts.filter(a => a.label.includes('ÓRGÃO')).map((a, idx) => (
+                      <div key={idx}><strong style={{ color: a.severity === 'critico' ? 'var(--red)' : 'var(--amber)' }}>{a.pct}%</strong> dos servidores estão em {a.label.replace(' — CRÍTICO', '').replace(' — ATENÇÃO', '')}.</div>
+                    ))
+                  ) : 'Distribuição de servidores entre os órgãos municipal parece equilibrada.'}
+                </div>
+              </div>
+              <div style={{ borderLeft: alertaReingresso ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Reingressos Atípicos</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+                  Foram detectados <strong style={{ color: alertaReingresso ? 'var(--amber)' : 'var(--text)' }}>{reingressos.length}</strong> reingressos. {alertaReingresso ? 'Demissões seguidas de recontratações (mesmo servidor) demandam investigação por possível fraude ou nepotismo.' : 'Nenhum reingresso atípico detectado no período.'}
+                </div>
+              </div>
+              <div style={{ borderLeft: alertaDiarias ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>
+                <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Volume de Diárias</div>
+                <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+                  Total gasto com diárias: <strong style={{ color: alertaDiarias ? 'var(--amber)' : 'var(--text)' }}>{fmtBRL(totalDiarias)}</strong>. {alertaDiarias ? 'O volume de diárias é expressivo e pode estar sendo utilizado como complementação salarial indireta.' : 'Volume de diárias dentro de níveis esperados.'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -397,9 +448,6 @@ export default function F3({ municipio, ano }) {
               <div style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: 'var(--green-bg)', color: 'var(--green)' }}>NOVO</span>
                 Endpoint: <code style={{ fontFamily: 'var(--mono)', color: 'var(--blue)', fontSize: 10 }}>/sim/folhas_pagamentos</code> + <code style={{ fontFamily: 'var(--mono)', color: 'var(--blue)', fontSize: 10 }}>/sim/agentes_publicos_folha</code>
-              </div>
-              <div style={{ position: 'relative', height: 200, marginBottom: 16 }}>
-                <canvas ref={chartFolha} role="img" aria-label="Evolução mensal da folha de pagamento" />
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>

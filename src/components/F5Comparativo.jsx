@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
-import { SparkleIcon } from '@phosphor-icons/react';
 import {
   getOrcamentoDespesa, getBalanceteDespesa,
-  orcParams, fmtN, fmt,
+  orcParams, fmtN, fmt, fmtBRL
 } from '../api';
 import { KpiCard, SectionHeader, ProgressBar, BtnOutline, Spinner, PageSkeleton } from './UI';
 
@@ -38,7 +37,7 @@ function somarPorFuncao(linhas, funcoes) {
   return linhas
     .filter(l => funcoes.includes(String(l.nr_funcao || l.codigo_funcao || '')))
     .reduce((acc, l) => acc + parseFloat(
-      l.vl_liquidado || l.valor_liquidado || l.vl_despesa || l.valor_despesa || l.vl_fixado || l.valor_fixado || 0
+      l.vl_liquidado || l.valor_liquidado || l.valor_liquidado_ate_mes || l.vl_despesa || l.valor_despesa || l.vl_fixado || l.valor_total_fixado_orcamento || l.valor_fixado || 0
     ), 0);
 }
 
@@ -188,7 +187,7 @@ export default function F5Comparativo({ ano }) {
   const menor = rankOrdenado[rankOrdenado.length - 1];
   const totalMaior = maior.saude + maior.educacao + maior.infra;
   const totalMenor = menor.saude + menor.educacao + menor.infra;
-  const dispPct = totalMaior > 0 ? Math.round((totalMaior - totalMenor) / totalMaior * 100) : 0;
+  const dispPct = totalMenor > 0 ? Math.round(((totalMaior - totalMenor) / totalMenor) * 100) : 0;
   const maxS = Math.max(...ranking.map(r => r.saude));
 
   const n = ranking.length;
@@ -220,6 +219,22 @@ export default function F5Comparativo({ ano }) {
   const outros = Math.max(0, 5000 - totalPie);
   const pieVals = [medias.educacao, medias.saude, medias.infra, outros];
   const pieTot = pieVals.reduce((a, b) => a + b, 0);
+
+  // Novos cálculos analíticos de diagnóstico
+  const sortedByPop = [...ranking].sort((a, b) => b.pop - a.pop);
+  const top3Pop = sortedByPop.slice(0, 3);
+  const bottom3Pop = sortedByPop.slice(Math.max(0, sortedByPop.length - 3));
+  const avgTop3Pop = top3Pop.reduce((acc, m) => acc + m.saude + m.educacao + m.infra, 0) / (top3Pop.length || 1);
+  const avgBottom3Pop = bottom3Pop.reduce((acc, m) => acc + m.saude + m.educacao + m.infra, 0) / (bottom3Pop.length || 1);
+  const diffEscala = avgTop3Pop > 0 ? ((avgBottom3Pop - avgTop3Pop) / avgTop3Pop) * 100 : 0;
+
+  let maxDev = 0;
+  let outlier = null;
+  ranking.forEach(m => {
+    const total = m.saude + m.educacao + m.infra;
+    const dev = totalPie > 0 ? Math.abs(total - totalPie) / totalPie : 0;
+    if (dev > maxDev) { maxDev = dev; outlier = { nome: m.nome, total, pct: (dev * 100).toFixed(0), isAcima: total > totalPie }; }
+  });
 
   return (
     <div>
@@ -318,35 +333,49 @@ export default function F5Comparativo({ ano }) {
             <ProgressBar value={dispPct} />
             <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 12 }}>Variação de <strong style={{ color: 'var(--text)' }}>{dispPct}%</strong> entre extremos.</div>
             <BtnOutline fullWidth onClick={() => setShowAnalise(s => !s)}>
-              {showAnalise ? 'Ocultar Análise Detalhada ✕' : 'Análise Detalhada ↗'}
+              {showAnalise ? 'Ocultar Diagnóstico Regional ✕' : 'Diagnóstico Regional ↗'}
             </BtnOutline>
             {showAnalise && (
               <div style={{ marginTop: 12, background: 'var(--bg2)', borderRadius: 8, padding: '12px 16px', animation: 'slideIn .2s ease' }}>
                 <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
-                <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Análise Detalhada da Disparidade Regional</h5>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 18px' }}>
-                  {Object.entries(destaques).map(([key, val]) => (
-                    <div key={key}>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600, borderLeft: `3px solid ${AREAS[key].cor}`, paddingLeft: 8 }}>
-                        Destaques em {AREAS[key].label}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                        Maior: <strong style={{ color: 'var(--text)' }}>{val.maior.nome}</strong> ({fmt(val.maior[key])}/hab)<br />
-                        Menor: <strong style={{ color: 'var(--text)' }}>{val.menor.nome}</strong> ({fmt(val.menor[key])}/hab)
-                      </div>
-                    </div>
-                  ))}
-                  <div>
-                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 6, fontWeight: 600 }}>Nível de Disparidade (CV)</div>
+                <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Diagnóstico Regional Aprofundado</h5>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+                  <div style={{ borderLeft: `3px solid var(--blue)`, paddingLeft: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>Economia de Escala</div>
                     <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
-                      Saúde: <strong style={{ color: cvSaude > 30 ? 'var(--amber)' : 'var(--text)' }}>{cvSaude}%</strong><br />
-                      Educação: <strong style={{ color: cvEducacao > 30 ? 'var(--amber)' : 'var(--text)' }}>{cvEducacao}%</strong><br />
+                      Os 3 menores municípios gastam <strong style={{ color: 'var(--text)' }}>{fmtBRL(avgBottom3Pop)}/hab</strong>.<br />
+                      Os 3 maiores gastam <strong style={{ color: 'var(--text)' }}>{fmtBRL(avgTop3Pop)}/hab</strong>.<br />
+                      {diffEscala > 15 ? `Cidades menores têm um custo per capita ${diffEscala.toFixed(0)}% mais alto, apontando forte peso de custos fixos.` : 'Não há diferença significativa de gastos per capita atrelada ao tamanho populacional.'}
+                    </div>
+                  </div>
+                  <div style={{ borderLeft: `3px solid var(--amber)`, paddingLeft: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>Desvios e Outliers</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                      {outlier ? (
+                        <>
+                          <strong style={{ color: 'var(--text)' }}>{outlier.nome}</strong> apresenta a maior discrepância da região.<br />
+                          Gasto {outlier.pct}% <strong style={{ color: outlier.isAcima ? 'var(--amber)' : 'var(--red)' }}>{outlier.isAcima ? 'acima' : 'abaixo'}</strong> da média regional ({fmtBRL(totalPie)}/hab).
+                        </>
+                      ) : 'Nenhum desvio atípico detectado.'}
+                    </div>
+                  </div>
+                  <div style={{ borderLeft: `3px solid var(--green)`, paddingLeft: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>Nível de Desigualdade (CV)</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                      Saúde: <strong style={{ color: cvSaude > 30 ? 'var(--amber)' : 'var(--text)' }}>{cvSaude}%</strong> | Educ: <strong style={{ color: cvEducacao > 30 ? 'var(--amber)' : 'var(--text)' }}>{cvEducacao}%</strong><br />
                       Infra: <strong style={{ color: cvInfra > 30 ? 'var(--amber)' : 'var(--text)' }}>{cvInfra}%</strong>
                     </div>
-                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>CV > 30% indica alta desigualdade no gasto entre municípios.</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>{Math.max(cvSaude, cvEducacao, cvInfra) > 30 ? 'Alta disparidade de gastos, indicando diferenças na qualidade dos serviços.' : 'Investimentos homogêneos entre as cidades.'}</div>
+                  </div>
+                  <div style={{ borderLeft: `3px solid var(--purple)`, paddingLeft: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4, fontWeight: 600 }}>Destaques Setoriais</div>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+                      Líder Saúde: <strong style={{ color: 'var(--text)' }}>{destaques.saude.maior.nome}</strong> ({fmtBRL(destaques.saude.maior.saude)})<br />
+                      Líder Educ: <strong style={{ color: 'var(--text)' }}>{destaques.educacao.maior.nome}</strong> ({fmtBRL(destaques.educacao.maior.educacao)})<br />
+                      Líder Infra: <strong style={{ color: 'var(--text)' }}>{destaques.infra.maior.nome}</strong> ({fmtBRL(destaques.infra.maior.infra)})
+                    </div>
                   </div>
                 </div>
-                <BtnOutline style={{ marginTop: 16, width: '100%' }} onClick={() => window.sendPrompt?.(`Analisando os dados de investimento per capita no Sertão Central em ${ano}, o que justifica a disparidade de ${dispPct}% entre os municípios? Quais fatores socioeconômicos podem influenciar essa diferença?`)}><SparkleIcon size={14} /> Explicar com IA</BtnOutline>
               </div>
             )}
           </div>

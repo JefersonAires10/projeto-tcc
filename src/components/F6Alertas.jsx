@@ -15,11 +15,13 @@ function muniNome(codigo) {
 }
 
 const METODOLOGIA_ALERTAS = [
-  { sev: 'alto', titulo: 'Pagamento sem Nota Fiscal', desc: 'Um pagamento foi liquidado, mas não há nenhuma nota fiscal eletrônica (NF-e) associada ao mesmo empenho. É um forte indício de irregularidade.' },
-  { sev: 'medio', titulo: 'Superfaturamento Suspeito', desc: 'O valor pago é significativamente maior (ex: mais que o dobro) que o valor total das notas fiscais vinculadas ao empenho.' },
-  { sev: 'medio', titulo: 'Discrepância de Valores', desc: 'O valor pago é superior ao valor da nota fiscal, mas não chega a ser um superfaturamento óbvio. Requer análise para justificar a diferença.' },
-  { sev: 'baixo', titulo: 'NF emitida sem Pagamento', desc: 'Existe uma nota fiscal registrada para um empenho, mas nenhum pagamento foi efetuado no período. Pode ser apenas um atraso no processo.' },
-  { sev: 'baixo', titulo: 'Fracionamento de Despesa', desc: 'Um único empenho possui um número elevado de notas fiscais associadas. Pode ser uma tentativa de fracionar compras para fugir de modalidades de licitação mais rigorosas.' },
+  { sev: 'alto', titulo: 'Pagamento sem NF vinculada', desc: 'Um pagamento foi liquidado, mas não há nenhuma nota fiscal eletrônica (NF-e) associada ao mesmo empenho. É um forte indício de irregularidade.' },
+  { sev: 'medio', titulo: 'Superfaturamento Suspeito', desc: 'O valor pago é mais que o dobro do valor total das notas fiscais vinculadas ao empenho.' },
+  { sev: 'medio', titulo: 'Discrepância de Valores', desc: 'O valor pago é superior ao valor da nota fiscal. Requer análise para justificar a diferença.' },
+  { sev: 'baixo', titulo: 'NF emitida sem pagamento', desc: 'Existe uma nota fiscal registrada para um empenho, mas nenhum pagamento foi efetuado no período.' },
+  { sev: 'baixo', titulo: 'Subpagamento', desc: 'O valor pago é inferior a 50% do valor da nota fiscal. Pode indicar retenção indevida ou parcelamento longo.' },
+  { sev: 'baixo', titulo: 'Fracionamento de Despesa', desc: 'Um único empenho possui 8 ou mais notas fiscais associadas. Pode indicar tentativa de burlar licitação.' },
+  { sev: 'baixo', titulo: 'Rateio Excessivo', desc: 'Um único empenho possui 8 ou mais pagamentos fragmentados realizados no período.' },
 ];
 
 function Paginacao({ pagina, totalPag, onChange }) {
@@ -227,7 +229,6 @@ export default function F6({ municipio, ano, onAlertCountChange }) {
             </div>
           ))}
         </div>
-        <BtnOutline style={{ marginTop: 12 }} onClick={() => window.sendPrompt?.('Como o sistema de alertas do Sertão Transparente detecta irregularidades nos empenhos públicos?')}>Como interpretar os alertas ↗</BtnOutline>
       </div>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginTop: 12 }}>

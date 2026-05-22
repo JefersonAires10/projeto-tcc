@@ -800,6 +800,15 @@ export default function F2({ municipio, ano }) {
   const pctCanceladas = lics.length > 0 ? ((licsCanceladas / lics.length) * 100).toFixed(1) : 0;
   const alertaCanceladas = parseFloat(pctCanceladas) > 15;
 
+  // Novo Insight: Concentração de Licitações no 4º Trimestre (Q4)
+  const licsQ4 = lics.filter(l => {
+    if (!l.data) return false;
+    const m = parseInt(l.data.substring(5, 7), 10);
+    return m >= 10; // Outubro, Novembro, Dezembro
+  });
+  const pctQ4 = lics.length > 0 ? ((licsQ4.length / lics.length) * 100).toFixed(1) : 0;
+  const alertaQ4 = parseFloat(pctQ4) > 35; // Alerta se mais de 35% ocorrer no fim do ano
+
   return (
     <div>
       <SectionHeader title="Monitor de Licitações e Contratos"
@@ -807,17 +816,11 @@ export default function F2({ municipio, ano }) {
           ? `/sim/processos_administrativos_contratacoes?data_inicio=${ano}-01-01&data_fim=${ano}-12-31&codigo_municipio=${municipio}`
           : `/sim/contratos?data_inicio=${ano}-01-01&data_fim=${ano}-12-31&codigo_municipio=${municipio} — ${contratos.length} contratos no ano`} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 }}>
-        <KpiCard label="Total em Licitações" badge={ano} badgeClass="anual" value={fmt(total)} sub={`${lics.length} processos`} />
-        <KpiCard label="Contratos" badge={abaVisao === 'contratos' ? 'Ativos' : 'Vigentes'}
-          badgeClass={abaVisao === 'contratos' ? 'efetuado' : 'anual'}
-          value={fmtN(nContr)}
-          delta={abaVisao === 'contratos' ? `${ativos} ativos · ${encerrados} encerrados` : `R$ ${totalContratosValor.toFixed(0)} em contratos`} />
-        <KpiCard label={isLicView ? 'Concentração Top 5' : 'Contratos Ativos'}
-          badge={isLicView ? 'Alerta' : 'Efetuado'}
-          badgeClass={isLicView ? 'alerta' : 'efetuado'}
-          value={isLicView ? `${concTop5}%` : fmtN(ativos)}
-          sub={isLicView ? 'dos valores totais' : `${encerrados} encerrados`} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+        <KpiCard label="Total Estimado" badge={ano} badgeClass="anual" value={fmt(total)} sub={`${lics.length} processos`} />
+        <KpiCard label="Contratação Direta" badge="Risco" badgeClass={alertaDireta ? 'alerta' : 'efetuado'} value={`${pctDireta}%`} delta={fmtBRL(valorDireta)} deltaClass={alertaDireta ? 'neg' : 'pos'} />
+        <KpiCard label="Taxa de Aditivos" badge="Relação" badgeClass={alertaAditivos ? 'alerta' : 'reservado'} value={`${pctAditivos}%`} delta={`${fmtBRL(valorAditivos)} aditivados`} deltaClass={alertaAditivos ? 'neg' : 'neu'} />
+        <KpiCard label="Tx. Frustração" badge="Eficiência" badgeClass={alertaCanceladas ? 'alerta' : 'efetuado'} value={`${pctCanceladas}%`} delta={`${licsCanceladas} canceladas`} deltaClass={alertaCanceladas ? 'neg' : 'pos'} />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
@@ -947,7 +950,7 @@ export default function F2({ municipio, ano }) {
               <div style={{ marginTop: 16, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, animation: 'slideIn .2s ease' }}>
                 <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
                 <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Diagnóstico do Exercício</h5>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
                   <div style={{ borderLeft: alertaAditivos ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>
                     <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Taxa de Aditivação</div>
                     <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
@@ -964,6 +967,12 @@ export default function F2({ municipio, ano }) {
                     <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Taxa de Frustração</div>
                     <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
                       <strong style={{ color: alertaCanceladas ? 'var(--amber)' : 'var(--text)' }}>{pctCanceladas}%</strong> das licitações ({licsCanceladas}) foram canceladas ou anuladas. {alertaCanceladas && 'Muitos cancelamentos geram retrabalho e sugerem editais mal formulados ou impugnados.'}
+                    </div>
+                  </div>
+                  <div style={{ borderLeft: alertaQ4 ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>
+                    <div style={{ fontSize: 11, color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 4 }}>Sazonalidade (Q4)</div>
+                    <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.5 }}>
+                      <strong style={{ color: alertaQ4 ? 'var(--amber)' : 'var(--text)' }}>{pctQ4}%</strong> das licitações ocorreram no 4º trimestre. {alertaQ4 && 'Alta concentração no fim do ano pode indicar pressa para gastar orçamento, reduzindo a qualidade das contratações.'}
                     </div>
                   </div>
                 </div>
