@@ -19,7 +19,7 @@ const ANOS = ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2
 export default function App() {
   const [active, setActive] = useState('f1');
   const [municipio, setMuni] = useState('144');
-  const [ano, setAno] = useState('2024');
+  const [ano, setAno] = useState('2026');
   const [refresh, setRefresh] = useState(0);
   const [alertCount, setAlertCount] = useState({ f6: 0, f7: 0 });
 
