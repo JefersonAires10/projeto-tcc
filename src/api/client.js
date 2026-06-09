@@ -1,4 +1,6 @@
-const BASE = '/api/sim';
+const TCE_API = 'https://api-dados-abertos.tce.ce.gov.br/sim';
+const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const BASE = isDev ? '/api/sim' : TCE_API;
 
 async function get(endpoint, params = {}) {
   try {

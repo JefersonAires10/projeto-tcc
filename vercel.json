@@ -1,8 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/sim/:path*",
-      "destination": "https://api-dados-abertos.tce.ce.gov.br/sim/:path*"
+      "source": "/api/sim/(.*)",
+      "destination": "https://api-dados-abertos.tce.ce.gov.br/sim/$1"
     }
   ],
   "headers": [
