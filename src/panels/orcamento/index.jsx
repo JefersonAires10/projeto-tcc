@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
 import { SparkleIcon } from '@phosphor-icons/react';
-import { getDadosOrcamentos, getBalanceteDespesa, orcParams, fmt } from '../api';
-import { KpiCard, Card, SectionHeader, BtnOutline, Spinner, PageSkeleton } from './UI';
+import { getDadosOrcamentos, getBalanceteDespesa, orcParams, fmt } from '../../api';
+import { KpiCard, Card, SectionHeader, BtnOutline, Spinner, PageSkeleton } from '../../components/ui';
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 

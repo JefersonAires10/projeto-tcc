@@ -1,6 +1,6 @@
-export { MUNICIPIOS_SERTAO, MESES, ANOS } from './api/constants';
-export { fmtAno, fmtAnoIntervalo, orcParams, licParams, muniParams } from './api/params';
-export { fmt, fmtN, fmtBRL } from './api/formatters';
+export { MUNICIPIOS_SERTAO, MESES, ANOS } from './constants';
+export { fmtAno, fmtAnoIntervalo, orcParams, licParams, muniParams } from './params';
+export { fmt, fmtN, fmtBRL } from './formatters';
 export {
   getMunicipios, getEmpresasEstatais,
   getDadosOrcamentos, getOrcamentoDespesa, getOrcamentoReceita, getProgramasGoverno,
@@ -19,4 +19,4 @@ export {
   getBensMunicipios, getReavalBaixasBens, getEmpenhosBens,
   getVeiculosMunicipais, getVeiculosLocados, getVeiculosCedidos,
   getDestinacaoVeiculos, getAbastecimentoVeiculos, getManutencaoVeiculos,
-} from './api/endpoints';
+} from './endpoints';

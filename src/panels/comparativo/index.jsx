@@ -3,8 +3,8 @@ import { Chart } from 'chart.js/auto';
 import {
   getOrcamentoDespesa, getBalanceteDespesa,
   orcParams, fmtN, fmt, fmtBRL
-} from '../api';
-import { KpiCard, SectionHeader, ProgressBar, BtnOutline, Spinner, PageSkeleton } from './UI';
+} from '../../api';
+import { KpiCard, SectionHeader, ProgressBar, BtnOutline, Spinner, PageSkeleton } from '../../components/ui';
 
 const MUNICIPIOS = [
   { codigo: '022', nome: 'Banabuiú', pop: 15940 },

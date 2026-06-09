@@ -113,6 +113,8 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 6, style 
   );
 }
 
+export { default as Paginacao } from './ui/Paginacao';
+
 export function PageSkeleton({ kpis = 4, layout = '2fr-1fr' }) {
   return (
     <div style={{ padding: 0 }}>
