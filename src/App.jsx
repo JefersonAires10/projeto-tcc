@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChartBarIcon, ClipboardIcon, UsersIcon, BuildingIcon, MapPinIcon, WarningIcon, BankIcon, ArrowsClockwiseIcon } from '@phosphor-icons/react';
+import { ChartBarIcon, ClipboardIcon, UsersIcon, BuildingIcon, MapPinIcon, WarningIcon, ArrowsClockwiseIcon } from '@phosphor-icons/react';
 import { MUNICIPIOS_SERTAO } from './api';
 import F1Orcamento from './components/F1Orcamento';
 import F2Licitacoes from './components/F2Licitacoes';
@@ -7,11 +7,10 @@ import F3Pessoal from './components/F3Pessoal';
 import F4Patrimonio from './components/F4Patrimonio';
 import F5Comparativo from './components/F5Comparativo';
 import F6Alertas from './components/F6Alertas';
-import F7Obras from './components/F7Obras';
 
 const PANELS = {
   f1: F1Orcamento, f2: F2Licitacoes, f3: F3Pessoal,
-  f4: F4Patrimonio, f5: F5Comparativo, f6: F6Alertas, f7: F7Obras,
+  f4: F4Patrimonio, f5: F5Comparativo, f6: F6Alertas,
 };
 
 const ANOS = ['2026', '2025', '2024', '2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016', '2015', '2014', '2013', '2012', '2011', '2010', '2009'];
@@ -21,7 +20,7 @@ export default function App() {
   const [municipio, setMuni] = useState('144');
   const [ano, setAno] = useState('2026');
   const [refresh, setRefresh] = useState(0);
-  const [alertCount, setAlertCount] = useState({ f6: 0, f7: 0 });
+  const [alertCount, setAlertCount] = useState({ f6: 0 });
 
   const handleAlertCountChange = (panel, count) => {
     setAlertCount(prev => ({ ...prev, [panel]: count }));
@@ -34,7 +33,6 @@ export default function App() {
     { id: 'f4', icon: <BuildingIcon size={20} />, label: 'Controle Patrimonial' },
     { id: 'f5', icon: <MapPinIcon size={20} />, label: 'Comparativo Regional' },
     { id: 'f6', icon: <WarningIcon size={20} />, label: 'Alertas e Compliance', badge: alertCount.f6 > 0 ? alertCount.f6 : null },
-    { id: 'f7', icon: <BankIcon size={20} />, label: 'Monitor de Obras', badge: alertCount.f7 > 0 ? alertCount.f7 : null },
   ];
 
   const ActivePanel = PANELS[active] || F1Orcamento;

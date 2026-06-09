@@ -103,9 +103,7 @@ export const getDeducoesNotasPag        = (p) => get('/deducoes_notas_pagamentos
 export const getTransferenciasFederais  = (p) => get('/transferencias_federais_estaduais', p); 
 export const getDiarias                 = (p) => get('/diarias', p);                           
 
-export const getObrasMunicipais   = (p) => get('/obras_municipais_servicos_engenharia', p);    
-export const getMedicoesObras     = (p) => get('/medicoes_obras_municipio', p);                 
-export const getStatusObras       = (p) => get('/status_obras_servico_engenharia', p);          
+
 
 export const getAgentesPublicos       = (p) => get('/agentes_publicos_municipais', p);
 export const getDesligamentos         = (p) => get('/desligamentos_agentes_publicos', p);
