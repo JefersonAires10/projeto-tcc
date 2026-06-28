@@ -11,6 +11,7 @@ import { KpiCard, Card, SectionHeader, Avatar, VinculoBadge, ProgressBar, BtnOut
 
 const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 const VINCULO_MAP = { 'E': 'EFETIVO', 'C': 'COMISSIONADO', 'T': 'TEMPORARIO' };
+const BATCH_SIZE = 4;
 
 export default function F3({ municipio, ano }) {
   const [loading, setLoad] = useState(true);
@@ -39,47 +40,35 @@ export default function F3({ municipio, ano }) {
       const exercicio_orcamento = `${anoAtual}00`;
       const meses = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 
-      const promessas = meses.map(mes => {
-        const p = {
-          ...params,
-          codigo_municipio: municipio,
-          exercicio_orcamento,
-          data_referencia_doc: `${anoAtual}${mes}`
-        };
-        return Promise.all([
-          getAgentesPublicos(p),
-          getFolhasPagamentos(p),
-          getAgentesPublicosFolha(p),
-          getDiarias(p),
-          getReingressos(p),
-        ]);
-      });
+      const baseParams = { ...params, codigo_municipio: municipio, exercicio_orcamento };
 
-      const resultados = await Promise.all(promessas);
+      const [agentesRaw, diariasData, reingData] = await Promise.all([
+        getAgentesPublicos({ ...baseParams, data_referencia_doc: `${anoAtual}01` }),
+        getDiarias({ ...baseParams, data_referencia_doc: `${anoAtual}01` }),
+        getReingressos({ ...baseParams, data_referencia_doc: `${anoAtual}01` }),
+      ]);
 
-      let agentesRaw = [];
-      let folhasRaw = [];
-      let folhaAgentesRaw = [];
-      let diariasData = [];
-      let reingData = [];
+      let allFolhas = [];
+      let allFolhaAgentes = [];
 
-      resultados.forEach(([ag, fo, fa, di, re]) => {
-        agentesRaw.push(...(ag?.elements || (Array.isArray(ag) ? ag : [])));
-        folhasRaw.push(...(fo?.elements || (Array.isArray(fo) ? fo : [])));
-        folhaAgentesRaw.push(...(fa?.elements || (Array.isArray(fa) ? fa : [])));
-        diariasData.push(...(di?.elements || (Array.isArray(di) ? di : [])));
-        reingData.push(...(re?.elements || (Array.isArray(re) ? re : [])));
-      });
+      for (let i = 0; i < meses.length; i += BATCH_SIZE) {
+        const batch = meses.slice(i, i + BATCH_SIZE);
+        const results = await Promise.all(
+          batch.map(mes => Promise.all([
+            getFolhasPagamentos({ ...baseParams, data_referencia_doc: `${anoAtual}${mes}` }),
+            getAgentesPublicosFolha({ ...baseParams, data_referencia_doc: `${anoAtual}${mes}` }),
+          ]))
+        );
+        results.forEach(([fo, fa]) => {
+          allFolhas.push(...(fo?.elements || (Array.isArray(fo) ? fo : [])));
+          allFolhaAgentes.push(...(fa?.elements || (Array.isArray(fa) ? fa : [])));
+        });
+      }
 
-      const agentesMap = new Map();
-      agentesRaw.forEach(a => {
-        const key = a.cpf_servidor || a.nome_servidor || JSON.stringify(a);
-        if (!agentesMap.has(key)) agentesMap.set(key, a);
-      });
-      const agentes = Array.from(agentesMap.values());
+      const agentesList = agentesRaw?.elements || (Array.isArray(agentesRaw) ? agentesRaw : []);
 
       const salaryMap = {};
-      folhaAgentesRaw.forEach(f => {
+      allFolhaAgentes.forEach(f => {
         const cpf = f.cpf_servidor || f.cpf || '';
         const rem = parseFloat(f.valor_remuneracao || f.vl_remuneracao || f.remuneracao || f.valor_vencimento || 0);
         if (cpf && rem > 0) {
@@ -87,13 +76,13 @@ export default function F3({ municipio, ano }) {
         }
       });
 
-      const agentesComSal = agentes.map(a => ({
+      const agentesComSal = agentesList.map(a => ({
         ...a,
         _remuneracao: salaryMap[a.cpf_servidor] || 0
       }));
 
       const folhaPorMes = {};
-      folhasRaw.forEach(f => {
+      allFolhas.forEach(f => {
         let mes = '01';
         if (f.data_referencia_doc) {
           mes = String(f.data_referencia_doc).slice(-2);
@@ -118,6 +107,9 @@ export default function F3({ municipio, ano }) {
       const salMed = sals.length ? sals.reduce((a, b) => a + b, 0) / sals.length : 0;
       const pctComiss = total ? ((comissN / total) * 100).toFixed(1) : '0';
       setStats({ total, salMed, pctComiss, efet, comissN, temp, totalFolhaAnual, maxFolhaMes });
+
+      const diariasList = diariasData?.elements || (Array.isArray(diariasData) ? diariasData : []);
+      const reingList = reingData?.elements || (Array.isArray(reingData) ? reingData : []);
 
       const flags = [];
 
@@ -166,8 +158,8 @@ export default function F3({ municipio, ano }) {
       setAlerts(flags);
       setServ(agentesComSal);
       setFolhas(folhasData?.length ? folhasData : []);
-      setDiarias(diariasData);
-      setReing(reingData);
+      setDiarias(diariasList);
+      setReing(reingList);
       setLoad(false);
     }
     load();
@@ -313,7 +305,7 @@ export default function F3({ municipio, ano }) {
 
         {showAnalise && (
           <div style={{ marginTop: 16, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, animation: 'slideIn .2s ease' }}>
-            <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}`}</style>
+            <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}`}</style>
             <h5 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Relatório Analítico e Alertas</h5>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
               <div style={{ borderLeft: alertaComiss ? '3px solid var(--amber)' : '3px solid var(--green)', paddingLeft: 12 }}>

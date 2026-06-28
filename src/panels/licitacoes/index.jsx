@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Chart } from 'chart.js/auto';
-import { HammerIcon, LightningIcon, PushPinIcon, BuildingIcon, ClipboardIcon, CalendarBlankIcon, UserIcon, FileTextIcon, MagnifyingGlassIcon, WarningCircleIcon, PackageIcon, CoinIcon, TrophyIcon, SparkleIcon } from '@phosphor-icons/react';
+import { HammerIcon, LightningIcon, PushPinIcon, BuildingIcon, ClipboardIcon, CalendarBlankIcon, UserIcon, FileTextIcon, MagnifyingGlassIcon, WarningCircleIcon, PackageIcon, CoinIcon, TrophyIcon, SparkleIcon, DownloadIcon } from '@phosphor-icons/react';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   getLicitacoes, getContrato, getLicitantes,
   getItensLicitacoes, getDotacoesLicitacoes, getContratados,
@@ -690,6 +692,97 @@ export default function F2({ municipio, ano }) {
   const porPaginaContrato = 15;
   const chartRef = useRef(null);
   const chartInst = useRef(null);
+  const [exporting, setExporting] = useState(false);
+
+  function exportPDF() {
+    setExporting(true);
+    try {
+      const pdf = new jsPDF('l', 'mm', 'a4');
+      const isLic = abaVisao === 'licitacoes';
+
+      pdf.setFontSize(18);
+      pdf.text('Monitor de Licitações e Contratos', 14, 20);
+      pdf.setFontSize(10);
+      pdf.text(`Município: ${municipio} · Ano: ${ano} · Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 14, 28);
+
+      if (isLic) {
+        const rows = lics.map(l => [
+          l.nr_licitacao,
+          l.modalidade,
+          l.ds_objeto,
+          l.nm_orgao,
+          l.valor > 0 ? fmtBRL(l.valor) : '–',
+          l.status,
+          l.data || '–',
+        ]);
+        autoTable(pdf, {
+          startY: 34,
+          head: [['Nº', 'Modalidade', 'Objeto', 'Órgão', 'Valor', 'Status', 'Data']],
+          body: rows,
+          styles: { fontSize: 7, font: 'helvetica' },
+          headStyles: { fillColor: [22, 27, 34], textColor: [255, 255, 255] },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: 26 },
+            2: { cellWidth: 'auto' },
+            3: { cellWidth: 40 },
+            4: { cellWidth: 28, halign: 'right' },
+            5: { cellWidth: 20 },
+            6: { cellWidth: 22 },
+          },
+          didParseCell(data) {
+            if (data.column.index === 5) {
+              const st = (data.cell.raw || '').toUpperCase();
+              if (st.includes('CONCLU')) data.cell.styles.textColor = [63, 185, 80];
+              else if (st.includes('CANCEL')) data.cell.styles.textColor = [248, 81, 73];
+              else if (st.includes('ABERTO')) data.cell.styles.textColor = [88, 166, 255];
+            }
+          },
+        });
+        pdf.setFontSize(8);
+        pdf.text(`Total: ${lics.length} processos · Valor total: ${fmtBRL(total)}`, 14, pdf.lastAutoTable.finalY + 8);
+      } else {
+        const rows = contratos.map(c => [
+          c.nr_contrato,
+          c.modalidade_contrato_nome + ' / ' + c.tipo_contrato_nome,
+          c.ds_objeto,
+          c.valor > 0 ? fmtBRL(c.valor) : '–',
+          c.status,
+          c.data_assinatura ? new Date(c.data_assinatura).toLocaleDateString('pt-BR') : '–',
+        ]);
+        autoTable(pdf, {
+          startY: 34,
+          head: [['Nº', 'Modalidade / Tipo', 'Objeto', 'Valor', 'Status', 'Assinatura']],
+          body: rows,
+          styles: { fontSize: 7, font: 'helvetica' },
+          headStyles: { fillColor: [22, 27, 34], textColor: [255, 255, 255] },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: 35 },
+            2: { cellWidth: 'auto' },
+            3: { cellWidth: 28, halign: 'right' },
+            4: { cellWidth: 20 },
+            5: { cellWidth: 22 },
+          },
+          didParseCell(data) {
+            if (data.column.index === 4) {
+              const st = (data.cell.raw || '').toUpperCase();
+              if (st === 'ATIVO') data.cell.styles.textColor = [63, 185, 80];
+              else if (st === 'ENCERRADO') data.cell.styles.textColor = [248, 81, 73];
+              else data.cell.styles.textColor = [88, 166, 255];
+            }
+          },
+        });
+        pdf.setFontSize(8);
+        const totalContVal = contratos.reduce((s, c) => s + c.valor, 0);
+        pdf.text(`Total: ${contratos.length} contratos · Valor total: ${fmtBRL(totalContVal)}`, 14, pdf.lastAutoTable.finalY + 8);
+      }
+
+      pdf.save(`${isLic ? 'licitacoes' : 'contratos'}-${municipio}-${ano}.pdf`);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     async function load() {
@@ -838,6 +931,12 @@ export default function F2({ municipio, ano }) {
             <input type="search" placeholder={isLicView ? 'Buscar objeto...' : 'Buscar nº/objeto/proc...'} value={filtros.busca}
               onChange={e => { setFiltros(f => ({ ...f, busca: e.target.value })); setPag(1); }}
               style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text)', padding: '6px 12px', borderRadius: 6, fontSize: 12, fontFamily: 'var(--font)', width: 180 }} />
+            <button onClick={exportPDF} disabled={exporting}
+              style={{ background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', padding: '6px 12px', borderRadius: 6, fontSize: 12, cursor: exporting ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font)', opacity: exporting ? .6 : 1 }}
+              onMouseEnter={e => { if (!exporting) { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; } }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text2)'; }}>
+              <DownloadIcon size={14} /> {exporting ? 'Exportando...' : 'Exportar PDF'}
+            </button>
             <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text3)' }}>{dadosFiltrados.length} resultados · pág {pagAtual}/{totalPaginas}</span>
           </div>
 
