@@ -278,8 +278,8 @@ export default function F4({ municipio, ano }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
         <KpiCard label="Valor Total Patrimônio" badge={ano} badgeClass="anual" value={fmt(totalVal)} delta="patrimônio consolidado" />
         <KpiCard label="Total de Bens" badge="Incorporados" badgeClass="efetuado" value={fmtN(totalQtd)} delta="+38 no mês" deltaClass="pos" />
-        <KpiCard label="Veículos Irregulares" badge="Alerta" badgeClass="alerta" value={fmtN(nIrregulares)} delta="frota própria" deltaClass={nIrregulares > 0 ? 'neg' : 'pos'} />
-        <KpiCard label="Custo Locação/Mês" badge="Novo" badgeClass="reservado" value={fmt(custoLocados)} delta="veículos terceirizados" />
+        <KpiCard label="Veículos Irregulares"  badgeClass="alerta" value={fmtN(nIrregulares)} delta="frota própria" deltaClass={nIrregulares > 0 ? 'neg' : 'pos'} />
+        <KpiCard label="Custo Locação/Mês" badgeClass="reservado" value={fmt(custoLocados)} delta="veículos terceirizados" />
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 12 }}>
